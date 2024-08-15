@@ -1,0 +1,266 @@
+---
+title: "Linear Models with R Notes"
+output: 
+  gfm:
+  always_allow_html:true
+---
+
+# Chapter 1 - Introduction
+
+## 1.2 Initial Data Analysis
+
+**This is a critical step that should always be performed.**
+
+You should make numerical summaries (means, standard deviations, max/min, correlations, etc.), whatever is appropriate to the dataset
+
+The `summary()` command is a quick and easy way to get usual univariate summary info to look for anything glaringly unexpected
+
+ # graphical summaries are equally important
+
+**For one variable at a time:**
+- boxplots
+
+- histograms
+
+- density plots
+
+- more
+
+**For two variables**
+- scatterplots are standard
+
+- interactive plots good for more than 2 variables
+
+
+
+Here is the data I will be working with
+```{r message = FALSE, results = FALSE}
+library(readxl)
+library(kableExtra)
+library(dplyr)
+
+df = read_excel("C:/Users/bbarrineau/Desktop/Complete Harvest Set - with B2021.xlsx", sheet= "SASDataRounded")
+kbl(sample_n(df,7)) %>%
+  kable_styling(bootstrap_options = c("striped"))
+```
+Here are some quick graphical summary options
+```{r message = FALSE, results = FALSE}
+par(mfrow = c(1,3))
+hist(df$PercentC)
+plot(density(df$PercentC, na.rm = TRUE))
+plot(sort(df$PercentC), pch = ".")
+```
+Here are some more for bivariate datasets
+```{r message = FALSE, results = FALSE}
+par(mfrow = c(1,2))
+plot(PercentC ~ GTcwtA, df)
+df$Rep = as.factor(df$Rep)
+plot(PercentC ~ Rep, df)
+```
+
+## 1.3 When to Use Regression Analysis
+
+Regression is used for explaining the relationship between a single response variable (Y), and one or more predictor (X) variables
+
+- **The response must be a continuous variable, but the predictors can be continuous, discrete, or categorical**
+
+## 1.4 History
+
+Francis Galton coined the term *regression to mediocrity* in 1875 in reference to the simple regression equation in the form: $$\frac{y-\overline{y}}{SD_{y}}=r\frac{(x-\overline{x})}{SD_{x}}$$
+Where *r* is the correlation between x and y
+
+We scale each variable to have a mean of zero and SD of one. this simplifies the regression to:
+
+$$y = rx$$
+
+```{r}
+dfScaled = data.frame(c(scale(df$PercentA2)), scale(df$A123cwtA))
+colnames(dfScaled) <- c("PercentA2", "A123cwtA")
+plot(PercentA2 ~ A123cwtA, dfScaled)
+abline(0,1)
+```
+
+## Exercises
+
+ Make a numerical and graphical summary of the data
+
+```{r}
+summary(df)
+```
+See above plots for graphical summary
+
+
+# Chapter 2 - Estimation
+
+## 2.1 - Linear Model
+
+A linear model can typically be simplified to the form:
+
+$$Y = \beta_0 + \beta_1X_1 + \beta_2X_2 + \beta_3X_3+ \varepsilon$$
+
+Where $\beta_i, i = 0,1,2,3$ are unkown *parameters*. $\beta_0$ is called the *intercept term*. and $\varepsilon$ is the error.
+
+In a linear model the *parameters enter linearly* - the predictors themselves do not have to be linear. For example:
+
+$$Y = \beta_0 + \beta_1X_1 + \beta_2logX_2 + \beta_3X_1X_2 + \varepsilon$$
+
+is a linear model, but:
+
+$$Y = \beta_0 + \beta_1X^{\beta_2}_1 + \varepsilon$$
+
+is not. Some relationships can be *transformed* to linearity - for example, $\beta_1X^{\beta_2}_1$ can be linearized by taking logs.
+
+Linear models are very flexible. predictors can be transformed and combined in any way, and linear models can easily be expanded and modified to handle complex datasets.
+
+Truly nonlinear models are rarely necessary and often arise from a theory about the relationships between the variables, rather than an empirical investigation
+
+## 2.2 - Matrix Representation
+
+if we have a response $Y$ and three predictors, $X1$, $X2$, and $X3$
+
+the data might be presented in tabular form as such:
+
+```{r}
+library(kableExtra)
+
+df2A2 <- t(data.frame(
+  c('$$y_1$$', '$$x_{11}$$', '$$x_{12}$$', '$$x_{13}$$'),
+  c('$$y_2$$', '$$x_{21}$$', '$$x_{22}$$', '$$x_{23}$$'),
+  c('...', '', '...', ''),
+  c('$$y_n$$', '$$x_{n1}$$', '$$x_{n2}$$', '$$x_{n3}$$')
+                   ))
+kbl(df2A2, row.names = FALSE) %>%
+  kable_styling(bootstrap_options = "striped")
+```
+where $$n$$ is the number of observations, or *cases* in the dataset. Given the actual data values, we might write the model as:
+
+$y_i = \beta_0 + \beta_{1x_i1} + \beta_{2x_i2} + \beta_{3x_i3} + \varepsilon\ \ \ \ \ \ \ \ \ \ \ i = 1,...,n$
+
+But the use of subscripts becomes inconvenient. We will simplify it using a *matrix/vector* representation. The regression equation is written as:
+
+$$y = X\beta + \varepsilon$$
+Where $y = (y_1,...,y_n)^T$, $\varepsilon = (\varepsilon_1,...,\varepsilon_n)^T$, $\beta = (\beta_0,...,\beta_n)^T$ and:
+
+$$X = 
+\left(\begin{array}{cccc}
+1\ x_{11}\ x_{12}\ x_{13} \\1\ x_{11}\ x_{12}\ x_{13} \\... \ \ \ \ ... \\1 \ x_{11}\ x_{12}\ x_{13}\end{array}\right)$$
+The column of ones incorporates the intercept term. One simple example is the *null model* where there no is no predictor, but only a mean $y = \mu + \varepsilon$:
+
+$$\left(\begin{array}{ccc}y \\ ...\\y_n\end{array}\right)=\left(\begin{array}{ccc}1\\ ... \\ 1\end{array}\right)\mu+\left(\begin{array}{ccc}\varepsilon_1 \\ ... \\ \varepsilon_n\end{array}\right)$$
+We can assume that $E\varepsilon = 0$ because if this were not so, we could absorb the nonzero expectation for the error into the mean $\mu$ to get a zero expectation.
+
+## 2.3 - Estimating $\beta$
+
+The regression model $y = X\beta + \varepsilon$ splits the response into a *systematic component* $X\beta$ and a *random component* $\varepsilon$.
+
+We want to choose $\beta$ so that the *systematic component* explains as much of the response as possible.
+
+Geometrically speaking:
+
+- The response lies in an $n$-dimensional space. that is, $y \in IR^n$ while $\beta \in IR^p$ where $p$ is the number of parameters.
+
+- if we include the intercept then $p$ is the number of predictors plus one. We will use this definition of $p$ from now on.
+
+The problem is to find $\beta$ so that $X\beta$ is as close to $Y$ as possible. The best choice, the estimate $\hat{\beta}$, is apparent via geometrical representation (see figure 2.1 if i put it in here)
+
+$\hat{\beta}$, is, in this sense, the best estimate of $\beta$ within the model space.
+
+The response predicted by the model is $\hat{y} = X\hat{\beta}$ or $Hy$ where $H$ is an *orthogonal projection matrix*.
+
+The difference between the actua response and the predicted response is denoted by $\hat{\varepsilon}$ and called the *residuals*.
+
+The goal here is to represent something complex: $y$, which is $n$-dimensional, in terms of something simpler: the model, which is $p$-dimensional.
+
+If our model is successful, the structure in the data shold be captures in those $p$ dimensions, leaving just random variation in the residuals which lie in an $(n-p)$-dimensional space.
+
+We have:
+
+- Data = Systematic Structure + Random Variation
+- $n$ dimensions = $p$ dimensions + $(n - p)$ dimensions
+
+## 2.4 - Least Squares Estimation
+
+The estimation of $\beta$ can also be considered from a nongeometrical point of view.
+
+We might define the best estimate of $\beta$ as the one which minimizes the sum of the squared errors. the *least squares* estimate of $\beta$, called $\hat{\beta}$ minimizes:
+
+$$\sum{\varepsilon^2_i} = \varepsilon^T\varepsilon = (y - X\beta)^T(y-X\beta)$$
+
+differentiationg with respect to $\beta$ and setting to 0, we find that $\hat{\beta}$ satisfies:
+
+$$X^TX\hat{\beta} = X^Ty$$
+
+these are called the *normal equations*. We can derive the same result using the geometrical approach. Provided $X^TX$ is invertible:
+
+- $\hat{\beta} = (X^TX)^{-1}X^Ty$
+- $X\hat{\beta} = X(X^TX)^{-1}X^Ty$
+- $\hat{y} = Hy$
+
+$H = X(X^TX)^{-1}X^T$ is called the *hat matrix* and is the orthogonal projection of $y$ onto the space spanned by $X$. $H$ is useful for theoretical manipulations, but it is not usually computed explicitly, as it is an $n$ x $n$ matrix which could be very large for some datasets.
+
+The following useful quantities can now be represented using $H$
+
+- The predicted or fitted values are $\hat{y} = Hy = X\hat{\beta}$
+- The residuals are $\hat{\varepsilon} = y - X\hat{\beta} = y - \hat{y} = (I-H)y$
+- The sun of squares (RSS) is $\hat{\varepsilon}^T\hat{\varepsilon} = y^T(I-H)^T(I-H)y = y^T(I-H)y$
+
+The least squares estimate is the best possible estimate of $\beta$ when the errors $\varepsilon$ are uncorrelated and have equal variance. more briefly put:
+
+- var $\varepsilon = \sigma^2I$
+
+$\hat{\beta}$ is unbiased and has variance $(X^TX)^{-1}\sigma^2$ provided var $\varepsilon = \sigma^2I$. since $\hat{\beta}$ is a vector, its variance is a matrix.
+
+We also need to estimate $\sigma^2$. we find that $E\hat{\varepsilon}^T\hat{\varepsilon} = \sigma^2(n-p)$, which suggests the estimator:
+
+$\hat{\sigma}^2 = \frac{\hat{\varepsilon}^T\hat{\varepsilon}}{n-p} = \frac{RSS}{n-p}$
+
+as an unbiased estimate of $\sigma^2$. $n - p$ is the *degrees of freedom* of the model.
+
+- Sometimes you need the standard error of a particular component of $\hat{\beta}$ which can be picked out as $se(\hat{\beta}_{i-1})=\sqrt{(X^TX)_{ii}^{-1}\hat{\sigma}}$.
+
+## 2.5 - Examples of Calculating $\hat{\beta}$
+
+In a few simple models, it is possible to derive explicit formulae for $\hat{\beta}$:
+
+1. When $y = \mu + \varepsilon$, $X = 1$ and $\beta = \mu$ so $X^TX = 1^T1 = n$ so:
+
+- $\hat{\beta} = (X^TX)^{-1}X^Ty = \frac{1}{n}1^Ty = \bar{y}$
+
+2. Simple linear regression (one predictor):
+
+- $y_i = \beta_0 + \beta_1x_i + \varepsilon_i$
+
+- $\left(\begin{array}{ccc}y_1\\...\\y_n\end{array}\right) = \left(\begin{array}{ccc}1\ \ \ \ \ \ x_1\\...\ \ \ \ \ \ \\1\ \ \ \ \ \ x_n\end{array}\right)\left(\begin{array}{cc}\beta_0\\\beta_1\end{array}\right) + \left(\begin{array}{ccc}\varepsilon_1\\...\\\varepsilon_n\end{array}\right)$
+
+We can now apply the formula, but a simpler approach is to rewrite the equation as:
+
+$y_i = \overbrace{\beta_0 + \beta_1\bar{x}}+\beta_1(x_i-\bar{x})+\varepsilon_i^{\beta'_0}$
+
+so now:
+
+$X = \left(\begin{array}{ccc}1\ \ \ x_1-\bar{x}\\...\ \ \ \ \ \ \ \ \ \ \ \\1\ \ \ \ \ \  x_n-\bar{x}\end{array}\right)$
+
+$X^TX = \left(\begin{array}{cc}n\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ 0 \\ 0\ \ \sum{}^n_{i=1}(x_i-\bar{x})^2\end{array}\right)$
+
+Next work through the rest of the cauculation to reconstruct the familiar estimates, that is:
+
+$\hat{\beta}_1 = \frac{\sum{(x_i-\bar{x})y_i}}{\sum{(x_i-\bar{x}})^2}$
+
+In higher dimensions, computers are usually needed to find such explicit formulae for the parameter estimates unless $X^TX$ happens to be a simple form.
+
+## 2.6 - Gauus-Markov Theorem
+
+To understand the Gauss-Markov Theorem we first need to understand the concept of an *estimable function*. A linear combination of the parameters $\Psi = c^T\beta$ is an estimable if an only if there exists a linear combination $a^Ty$ such that:
+
+$Ea^Ty = c^T\beta\ \ \ \ \ \forall\beta$
+
+Whole bunch of math that im not writing - check the book.
+
+The Gauss-Markov theorem shows that the least squares estimate $\hat{\beta}$ is a good choice, but it does require that the errors are uncorrelated and have equal variance.
+
+Situations where estimators other than ordinary least squares should be considered are:
+- When the errors are correlated or have unequal variance, generalized least squares should be used. See section 6.1
+- When the error distribution is long-tailed, then robust estimates might be used. Robust estimates are typically not linear in y. see section 6.4
+- When the predictors are highly correlated (collinear), then biased estimators such as ridge regression might be preferable (see chapter 9)
+
+## 2.7 - Goodness of Fit
